@@ -7,9 +7,7 @@ editor: visual
 
 Here is a random plot for the first assignement
 
-x <- rnorm(75000, mean = 50, sd = 5)
-hist(x)
----
+x \<- rnorm(75000, mean = 50, sd = 5) hist(x) ---
 
 ## Quarto
 
