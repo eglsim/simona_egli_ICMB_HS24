@@ -21,7 +21,7 @@ website:
     collapse-level: 1
     contents: 
       - index.qmd
-      - hw1/index.qmd
+      - hw1/indexhw1.qmd
       - hw2/indexhm2.qmd
 
 format:
