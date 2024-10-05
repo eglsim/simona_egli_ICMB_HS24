@@ -1,0 +1,157 @@
+# Assignment 2, part 1: Replication of the Economics Simulation
+
+Preliminary definitions
+
+```{r}
+N <- 5000 # default size of the population
+MU <- 100 # default mean of the population
+
+population <- rnorm(N, mean=MU, sd=MU/5)
+```
+
+Gini Coefficient
+
+```{r}
+gini <- function(y) {
+  y <- sort(y)
+  n <- length(y)
+  numer <- 2*(sum(1:n) * y)
+  denom <- n * sum(y)
+  gini_coeff <- (numer / denom) - (n + 1) / n
+  return(gini_coeff)
+}
+
+gini(population)
+```
+
+Plotting a histogram of the population
+
+```{r}
+hist(population)
+```
+
+Transaction function
+
+```{r}
+random_split <- function(a, b) {
+  pot <- a + b
+  share <- runif(1, min = 0, max = pot)
+  return(c(share, pot - share))
+}
+
+random_split(100, 100)
+
+```
+
+Interaction function 
+```{r} 
+anyone <- function(N) { 
+  return(sample(0:(N-1),2)) 
+  }
+
+anyone(8)
+```
+
+Simulation function
+```{r}
+step <- function(population, transaction = random_split, interaction = anyone) {
+  indices <- interaction(length(population))
+  i <- indices[1]
+  j <- indices[2]
+  new_values <- transaction(population[i], population[j])
+  population[i] <- new_values[1]
+  population[j] <- new_values[2]
+  return(population)
+}
+
+simulate <- function(population, T, step_function = step, transaction = random_split, interaction = anyone) {
+  snapshots <- list()
+  snapshots[[1]] <- population
+  for(t in 1:T) {
+    population <- step_function(population, transaction, interaction)
+    snapshots[[t + 1]] <- population
+  }
+  return(snapshots)
+}
+
+simulate(population, 2)
+```
+Visualisation
+```{r}
+library(ggplot2)
+library(gridExtra)
+
+# Helper function to calculate the Gini coefficient
+gini <- function(x) {
+  x <- sort(x)
+  n <- length(x)
+  G <- sum((2 * (1:n) - n - 1) * x) / (n * sum(x))
+  return(G)
+}
+
+# Helper function to calculate the percentile value
+percentile <- function(pct, items) {
+  return(items[min(length(items), floor(length(items) * pct / 100))])
+}
+
+# Helper function to create histograms
+hist_plot <- function(data, title, range) {
+  ggplot(data.frame(x = data), aes(x = x)) + 
+    geom_histogram(binwidth = diff(range) / 30, fill = "blue", color = "black") + 
+    xlim(range) + 
+    ggtitle(title) + 
+    xlab("Wealth") + 
+    ylab("Frequency") +
+    theme_minimal()
+}
+
+# The main function that simulates and shows results
+show <- function(population, k = 40, percentiles = c(1, 10, 50, 90, 99), ...) {
+  N <- length(population)
+  start <- population
+  results <- lapply(seq(0, k * N, N / 10), function(t) {
+    pop <- simulate(population, T = k * N, ...)
+    list(t = t, pop = sort(pop))
+  })
+}
+  
+  # Print the statistics
+  cat(sprintf("   t    Gini stdev %s\n", paste(sprintf("%3d%%", percentiles), collapse = " ")))
+  cat("------- ---- -----", paste(rep(" ----", length(percentiles)), collapse = ""), "\n")
+  for (res in results) {
+    if (res$t %% (k * N / 10) == 0) {
+      pct_values <- sapply(percentiles, function(pct) percentile(pct, res$pop))
+      cat(sprintf("%7d %.2f %5.1f", res$t, gini(res$pop), sd(res$pop)), 
+          paste(sprintf("%4.0f", pct_values), collapse = " "), "\n")
+    }
+  }
+  
+  # Percentile plot
+  plt_list <- list()
+  for (pct in percentiles) {
+    line <- sapply(results, function(res) percentile(pct, res$pop))
+    plt_list[[length(plt_list) + 1]] <- ggplot(data.frame(Time = seq(0, k * N, N / 10), Value = line), aes(x = Value, y = Time)) + 
+      geom_line() +
+      ggtitle(sprintf("%d Percentile Plot", pct)) +
+      xlab("Wealth") + ylab("Time") +
+      theme_minimal()
+  }
+  grid.arrange(grobs = plt_list, ncol = length(percentiles))
+
+  # Histograms
+  R <- range(c(start, population))
+  start_hist <- hist_plot(start, "Start", R)
+  end_hist <- hist_plot(population, "End", R)
+  grid.arrange(start_hist, end_hist, ncol = 2)
+
+  # Ordered Curves
+  plot_order <- data.frame(Order = 1:length(population), Start = sort(start), End = sort(population))
+  ggplot(plot_order) + 
+    geom_line(aes(x = Start, y = Order, color = "Start")) + 
+    geom_line(aes(x = End, y = Order, color = "End")) +
+    xlab("Wealth") + ylab("Order") +
+    theme_minimal()
+
+```
+
+Disclosure: A lot of this assignment was created by at least consulting ChatGPT

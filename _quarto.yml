@@ -22,7 +22,7 @@ website:
     contents: 
       - index.qmd
       - hw1/indexhw1.qmd
-      - hw2/indexhm2.qmd
+      - hw2/indexhw2.qmd
 
 format:
   html:
