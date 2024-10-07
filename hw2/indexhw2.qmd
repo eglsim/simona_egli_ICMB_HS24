@@ -81,30 +81,6 @@ Visualisation
 library(ggplot2)
 library(gridExtra)
 
-# Helper function to calculate the Gini coefficient
-gini <- function(x) {
-  x <- sort(x)
-  n <- length(x)
-  G <- sum((2 * (1:n) - n - 1) * x) / (n * sum(x))
-  return(G)
-}
-
-# Helper function to calculate the percentile value
-percentile <- function(pct, items) {
-  return(items[min(length(items), floor(length(items) * pct / 100))])
-}
-
-# Helper function to create histograms
-hist_plot <- function(data, title, range) {
-  ggplot(data.frame(x = data), aes(x = x)) + 
-    geom_histogram(binwidth = diff(range) / 30, fill = "blue", color = "black") + 
-    xlim(range) + 
-    ggtitle(title) + 
-    xlab("Wealth") + 
-    ylab("Frequency") +
-    theme_minimal()
-}
-
 # The main function that simulates and shows results
 show <- function(population, k = 40, percentiles = c(1, 10, 50, 90, 99), ...) {
   N <- length(population)
@@ -113,19 +89,18 @@ show <- function(population, k = 40, percentiles = c(1, 10, 50, 90, 99), ...) {
     pop <- simulate(population, T = k * N, ...)
     list(t = t, pop = sort(pop))
   })
-}
-  
+
   # Print the statistics
   cat(sprintf("   t    Gini stdev %s\n", paste(sprintf("%3d%%", percentiles), collapse = " ")))
   cat("------- ---- -----", paste(rep(" ----", length(percentiles)), collapse = ""), "\n")
   for (res in results) {
     if (res$t %% (k * N / 10) == 0) {
-      pct_values <- sapply(percentiles, function(pct) percentile(pct, res$pop))
+      pct_values <- sapply(percentiles, function(pct) percentile(pct, res$pop)) # Explicitly pass percentiles
       cat(sprintf("%7d %.2f %5.1f", res$t, gini(res$pop), sd(res$pop)), 
           paste(sprintf("%4.0f", pct_values), collapse = " "), "\n")
     }
   }
-  
+
   # Percentile plot
   plt_list <- list()
   for (pct in percentiles) {
@@ -151,7 +126,8 @@ show <- function(population, k = 40, percentiles = c(1, 10, 50, 90, 99), ...) {
     geom_line(aes(x = End, y = Order, color = "End")) +
     xlab("Wealth") + ylab("Order") +
     theme_minimal()
+}
 
 ```
 
-Disclosure: A lot of this assignment was created by at least consulting ChatGPT
+Disclosure: A lot of this assignment was created by consulting ChatGPT
