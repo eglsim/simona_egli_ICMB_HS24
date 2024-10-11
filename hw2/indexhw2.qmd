@@ -1,4 +1,8 @@
-# Assignment 2, part 1: Replication of the Economics Simulation
+# Assignment 2: The Economics Simulation
+
+Disclosure: A lot of this assignment was created by consulting ChatGPT, especially during the (as of yet) unsuccessful attempt to not have the endless warning "NAs produziert" as the final output
+
+___
 
 Preliminary definitions
 
@@ -7,6 +11,10 @@ N <- 5000 # default size of the population
 MU <- 100 # default mean of the population
 
 population <- rnorm(N, mean=MU, sd=MU/5)
+
+percentile <- function(p, x) {
+  return(quantile(x, probs = p / 100, na.rm = TRUE))
+}
 ```
 
 Gini Coefficient
@@ -15,13 +23,11 @@ Gini Coefficient
 gini <- function(y) {
   y <- sort(y)
   n <- length(y)
-  numer <- 2*(sum(1:n) * y)
+  numer <- sum((2 * (1:n) - n - 1) * y)
   denom <- n * sum(y)
-  gini_coeff <- (numer / denom) - (n + 1) / n
+  gini_coeff <- numer / denom
   return(gini_coeff)
 }
-
-gini(population)
 ```
 
 Plotting a histogram of the population
@@ -36,7 +42,7 @@ Transaction function
 random_split <- function(a, b) {
   pot <- a + b
   share <- runif(1, min = 0, max = pot)
-  return(c(share, pot - share))
+  return(c(max(0, share), max(0, pot - share)))  # Ensure values are non-negative
 }
 
 random_split(100, 100)
@@ -74,7 +80,6 @@ simulate <- function(population, T, step_function = step, transaction = random_s
   return(snapshots)
 }
 
-simulate(population, 2)
 ```
 Visualisation
 ```{r}
@@ -128,6 +133,6 @@ show <- function(population, k = 40, percentiles = c(1, 10, 50, 90, 99), ...) {
     theme_minimal()
 }
 
+show(population)
 ```
 
-Disclosure: A lot of this assignment was created by consulting ChatGPT
