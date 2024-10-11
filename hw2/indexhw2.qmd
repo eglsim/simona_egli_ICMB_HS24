@@ -7,7 +7,7 @@ ___
 Preliminary definitions
 
 ```{r}
-N <- 5000 # default size of the population
+N <- 100 # default size of the population
 MU <- 100 # default mean of the population
 
 population <- rnorm(N, mean=MU, sd=MU/5)
@@ -81,58 +81,93 @@ simulate <- function(population, T, step_function = step, transaction = random_s
 }
 
 ```
+
 Visualisation
 ```{r}
 library(ggplot2)
 library(gridExtra)
 
-# The main function that simulates and shows results
-show <- function(population, k = 40, percentiles = c(1, 10, 50, 90, 99), ...) {
-  N <- length(population)
-  start <- population
-  results <- lapply(seq(0, k * N, N / 10), function(t) {
-    pop <- simulate(population, T = k * N, ...)
-    list(t = t, pop = sort(pop))
-  })
-
-  # Print the statistics
-  cat(sprintf("   t    Gini stdev %s\n", paste(sprintf("%3d%%", percentiles), collapse = " ")))
-  cat("------- ---- -----", paste(rep(" ----", length(percentiles)), collapse = ""), "\n")
-  for (res in results) {
-    if (res$t %% (k * N / 10) == 0) {
-      pct_values <- sapply(percentiles, function(pct) percentile(pct, res$pop)) # Explicitly pass percentiles
-      cat(sprintf("%7d %.2f %5.1f", res$t, gini(res$pop), sd(res$pop)), 
-          paste(sprintf("%4.0f", pct_values), collapse = " "), "\n")
-    }
-  }
-
-  # Percentile plot
-  plt_list <- list()
-  for (pct in percentiles) {
-    line <- sapply(results, function(res) percentile(pct, res$pop))
-    plt_list[[length(plt_list) + 1]] <- ggplot(data.frame(Time = seq(0, k * N, N / 10), Value = line), aes(x = Value, y = Time)) + 
-      geom_line() +
-      ggtitle(sprintf("%d Percentile Plot", pct)) +
-      xlab("Wealth") + ylab("Time") +
-      theme_minimal()
-  }
-  grid.arrange(grobs = plt_list, ncol = length(percentiles))
-
-  # Histograms
-  R <- range(c(start, population))
-  start_hist <- hist_plot(start, "Start", R)
-  end_hist <- hist_plot(population, "End", R)
-  grid.arrange(start_hist, end_hist, ncol = 2)
-
-  # Ordered Curves
-  plot_order <- data.frame(Order = 1:length(population), Start = sort(start), End = sort(population))
-  ggplot(plot_order) + 
-    geom_line(aes(x = Start, y = Order, color = "Start")) + 
-    geom_line(aes(x = End, y = Order, color = "End")) +
-    xlab("Wealth") + ylab("Order") +
-    theme_minimal()
+# Function to calculate percentiles
+percent <- function(pct, items) {
+  return(quantile(items, probs = pct / 100))
 }
 
-show(population)
+# Function to simulate and display results
+show <- function(population, k = 40, percentiles = c(1, 10, 50, 90, 99), transaction = random_split, interaction = anyone, step_function = step) {
+  N <- length(population)
+  start <- population
+  T <- k * N
+  
+  # Run the simulation
+  results <- lapply(seq_len(T), function(t) {
+    pop <- simulate(population, T, step_function, transaction, interaction)[[t]]
+    list(t = t, pop = sort(pop))  # Sort the population at each step
+  })
+  
+  # Filter results to only include the relevant time steps
+  results <- results[seq(1, T, by = N / 10)]  # Print every N/10 steps
+  
+  # Printout
+  cat(sprintf("   t    Gini   stdev  %s\n", paste(sprintf("%3d%%", percentiles), collapse = " ")))
+  cat(sprintf("------- ----  -----  %s\n", paste(rep("----", length(percentiles)), collapse = " ")))
+  
+  for (res in results) {
+    t <- res$t
+    pop <- res$pop
+    gini_val <- gini(pop)
+    stdev_val <- sd(pop)
+    perc_vals <- sapply(percentiles, function(pct) percent(pct, pop))
+    
+    if (t %% (k * N / 10) == 0) {
+      cat(sprintf("%7d %.2f  %5.1f  %s\n", t, gini_val, stdev_val, paste(sprintf("%4.0f", perc_vals), collapse = " ")))
+    }
+  }
+  
+  # Plot Percentile Plots
+  times <- sapply(results, function(res) res$t)
+  data_list <- lapply(percentiles, function(pct) {
+    sapply(results, function(res) percent(pct, res$pop))
+  })
+  
+  percentile_plot <- ggplot() + theme_minimal() +
+    labs(x = 'Time', y = 'Wealth', title = paste(percentiles, 'Percentile Plots', sep = "/")) +
+    geom_line(aes(x = times, y = data_list[[1]], color = as.factor(percentiles[1])), size = 1) +
+    geom_line(aes(x = times, y = data_list[[2]], color = as.factor(percentiles[2])), size = 1) +
+    geom_line(aes(x = times, y = data_list[[3]], color = as.factor(percentiles[3])), size = 1) +
+    geom_line(aes(x = times, y = data_list[[4]], color = as.factor(percentiles[4])), size = 1) +
+    geom_line(aes(x = times, y = data_list[[5]], color = as.factor(percentiles[5])), size = 1) +
+    scale_color_discrete(name = "Percentiles")
+  
+  print(percentile_plot)
+  
+  # Plot Histograms (start vs end)
+  R <- range(c(start, population))
+  start_hist <- ggplot() + theme_minimal() + 
+    geom_histogram(aes(x = start), binwidth = diff(R) / 30, fill = 'lightgreen', alpha = 0.7) + 
+    labs(title = "Start", x = "Wealth", y = "Frequency")
+  
+  end_hist <- ggplot() + theme_minimal() + 
+    geom_histogram(aes(x = population), binwidth = diff(R) / 30, fill = 'lightblue', alpha = 0.7) + 
+    labs(title = "End", x = "Wealth", y = "Frequency")
+  
+  grid.arrange(start_hist, end_hist, ncol = 2)
+  
+  # Plot Ordered Curves
+  order <- seq_along(start)
+  start_sorted <- sort(start)
+  pop_sorted <- sort(population)
+  
+  ordered_plot <- ggplot() + theme_minimal() +
+    geom_line(aes(x = start_sorted, y = order, color = "Start"), size = 1) +
+    geom_line(aes(x = pop_sorted, y = order, color = "End"), size = 1) +
+    labs(x = "Wealth", y = "Order", title = "Ordered Curves") +
+    scale_color_manual(values = c("Start" = "green", "End" = "blue")) +
+    theme(legend.title = element_blank())
+  
+  print(ordered_plot)
+}
+
+# Example usage:
+# show(population)
 ```
 
